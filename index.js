@@ -1,60 +1,53 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-// Hiru News URL
-const hiruUrl = 'https://www.hirunews.lk/';
+// Middleware to handle JSON requests
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  next();
-});
+// Endpoint for scraping news from HiruNews
+app.get('/hirunews/news', async (req, res) => {
+    const url = "http://www.hirunews.lk/sinhala/local-news.php";
+    
+    try {
+        // Fetching the HTML of the Hiru News page
+        const { data: html } = await axios.get(url);
+        const $ = cheerio.load(html, { decodeEntities: false });
+        const results = [];
 
-async function scrapeHiruNews() {
-  try {
-    const response = await axios.get(hiruUrl);
-    if (response.status === 200) {
-      const $ = cheerio.load(response.data);
-      let newsList = [];
+        // Looping through each news article on the page
+        $('div.lts-cntp').each((i, elem) => {
+            const title = $(elem).find('a').text().trim(); // Extracting title text
+            const link = $(elem).find('a').attr('href'); // Extracting URL
+            const image = $(elem).find('img').attr('src'); // Extracting image URL
 
-      $('.latest-news-slide .item').each((i, el) => {
-        const title = $(el).find('.caption h2 a').text().trim();
-        const description = $(el).find('.caption p').text().trim();
-        const image = $(el).find('img').attr('src');
-        const link = hiruUrl + $(el).find('.caption h2 a').attr('href');
-
-        newsList.push({
-          title,
-          description,
-          image,
-          link,
+            // Only adding news if the title and link are valid
+            if (title && link) {
+                results.push({
+                    title,
+                    url: link.startsWith('http') ? link : `http://www.hirunews.lk${link}`,
+                    image: image ? (image.startsWith('http') ? image : `http://www.hirunews.lk${image}`) : null,
+                });
+            }
         });
-      });
 
-      return newsList;
+        // If no articles are found, return an error message
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'No news articles found.' });
+        }
+
+        // Sending the results as a response
+        res.json({ data: results });
+    } catch (error) {
+        console.error('Error fetching the news:', error.message);
+        res.status(500).json({ message: 'Failed to fetch news articles.' });
     }
-  } catch (error) {
-    console.error('Error scraping Hiru News:', error);
-    return [];
-  }
-}
-
-// Route for Hiru News
-app.get('/hiru-news', async (req, res) => {
-  try {
-    const newsData = await scrapeHiruNews();
-    res.json({
-      powered_by: 'DIZER',
-      data: newsData,
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching Hiru News' });
-  }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// Start the server
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
 });
