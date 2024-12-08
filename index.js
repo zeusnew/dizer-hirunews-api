@@ -15,14 +15,25 @@ app.get('/hirunews/news', async (req, res) => {
     try {
         // Fetching the HTML of the Hiru News page
         const { data: html } = await axios.get(url);
+        console.log('Page fetched successfully');
+
+        // Load the HTML with Cheerio
         const $ = cheerio.load(html, { decodeEntities: false });
         const results = [];
+
+        // Debug: Log the raw HTML (comment out after checking)
+        // console.log(html);
 
         // Looping through each news article on the page
         $('div.lts-cntp').each((i, elem) => {
             const title = $(elem).find('a').text().trim(); // Extracting title text
             const link = $(elem).find('a').attr('href'); // Extracting URL
             const image = $(elem).find('img').attr('src'); // Extracting image URL
+
+            // Log individual elements for debugging
+            console.log(`Title: ${title}`);
+            console.log(`Link: ${link}`);
+            console.log(`Image: ${image}`);
 
             // Only adding news if the title and link are valid
             if (title && link) {
